@@ -1,5 +1,3 @@
-# Cloned external repositories (managed outside version control)
-external/devotg/
 
 # Python
 __pycache__/
