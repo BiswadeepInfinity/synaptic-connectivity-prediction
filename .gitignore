@@ -1,0 +1,33 @@
+# Cloned external repositories (managed outside version control)
+external/devotg/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Test / coverage artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editor / OS
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+
+# Experiment outputs (keep structure, ignore heavy files)
+results/*.pt
+results/*.pkl
+results/checkpoints/
+
+# Tensorboard logs
+runs/

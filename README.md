@@ -106,17 +106,17 @@ pip install -e .
 
 ## Roadmap
 
-| Phase | Description |
-|---|---|
-| 0 | Environment setup, load and verify all 8 snapshots against paper-reported counts |
-| 1 | Reproduce DevoTG's own lineage-prediction baseline (target AUC 0.839 ± 0.007) — pipeline-correctness gate |
-| 2 | Plain structure-only connectivity-change baseline (novel in isolation — DevoTG never built this) |
-| 3 | Trajectory reconstruction (A1 interpolation, A2 blind structural inference), H2 validated |
-| 4 | Motif discovery module, synthetic sanity-checked before real data |
-| 5 | Full model assembly (Modules A–E) |
-| 6 | Full baseline ladder and ablations, H1 tested |
-| 7 | Interpretability case study (AVA/AVB/AVE), H3 tested |
-| 8 | Write-up |
+| Phase | Description | Status |
+|---|---|---|
+| 0 | Environment setup, loader verification, node consistency, and non-leakage temporal split tests | ✅ Complete (17 tests passing) |
+| 1 | Reproduce DevoTG's lineage-prediction baseline (target AUC 0.839 ± 0.007) — pipeline correctness gate | ✅ Complete (Mean AUC 0.8398 across 5 seeds) |
+| 2 | Plain structure-only connectivity-change baseline (novel in isolation — DevoTG never built this) | Up next |
+| 3 | Trajectory reconstruction (A1 interpolation, A2 blind structural inference), H2 validated | Pending |
+| 4 | Motif discovery module, synthetic sanity-checked before real data | Pending |
+| 5 | Full model assembly (Modules A–E) | Pending |
+| 6 | Full baseline ladder and ablations, H1 tested | Pending |
+| 7 | Interpretability case study (AVA/AVB/AVE), H3 tested | Pending |
+| 8 | Write-up | Pending |
 
 Full detail, equations, and hyperparameters for every module: [`docs/Final_Detailed_Architecture.md`](./docs/Final_Detailed_Architecture.md).
 
@@ -127,12 +127,20 @@ Full detail, equations, and hyperparameters for every module: [`docs/Final_Detai
 This project is built test-first. Every module has a corresponding test file asserting the specific failure modes we've identified as high-risk for this kind of temporal graph pipeline (temporal leakage, dictionary collapse, broadcast shape errors, and more — full list in [`docs/Complete_Build_Book_With_Tests.md`](./docs/Complete_Build_Book_With_Tests.md)).
 
 ```bash
-pytest                          # run everything
-pytest data/test_loader.py      # run one module's tests
-pytest -k "leakage"             # run tests matching a keyword
+# Run entire test suite
+pytest
+
+# Run Phase 1 DevoTG reproduction gate
+pytest test_phase1_reproduction.py -v
+
+# Run Phase 0 data loader and temporal split tests
+pytest data/test_loader.py -v
+
+# Run Phase 1 & 2 baseline tests
+pytest baseline/test_tgn.py -v
 ```
 
-**Rule:** no module is considered done until its tests pass. No claim goes in the final paper without a corresponding passing test — see the anomaly-to-test cross-reference table in the build book.
+**Gate Rule:** Phase 1 gate (`test_phase1_reproduction.py`) must pass with mean test AUC within $0.839 \pm 0.02$ before any novel PCDGM module is trusted.
 
 ---
 
@@ -154,19 +162,21 @@ pytest -k "leakage"             # run tests matching a keyword
 
 Full honest novelty positioning: [`docs/Research_Proposal.md`](./docs/Research_Proposal.md), Section 2.
 
-
+---
 
 ## Citation
 
 If referencing this work, please also cite the foundational sources:
 
-
+```
 Witvliet, D., et al. "Connectomes across development reveal principles of
 brain maturation." Nature 596.7871 (2021): 257-261.
 
 Gayen, J. "DevoTG: Temporal Graph Neural Networks for Modeling C. elegans
 Developmental Connectomics." arXiv:2606.21940 (2026).
+```
 
+---
 
 ## License
 
