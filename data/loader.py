@@ -38,8 +38,17 @@ import torch
 # ---------------------------------------------------------------------------
 REAL_HOURS: List[int] = [0, 5, 8, 16, 23, 27, 45, 45]
 
-# Paper-reported edge counts per snapshot (858–2496)
-_PAPER_EDGE_COUNTS: List[int] = [858, 1000, 1145, 1356, 1647, 1762, 2496, 2465]
+# Paper-reported edge counts per snapshot (Witvliet et al. Nature 2021 Table 1)
+# Chemical synapses (directed connections):
+_PAPER_CHEMICAL_EDGE_COUNTS: List[int] = [775, 986, 1012, 1136, 1515, 1525, 2191, 2186]
+# Electrical synapses / gap junctions (symmetric directed edges, undirected pairs * 2):
+# Directed edges in connectome graphs: [162, 244, 184, 412, 572, 424, 570, 604]
+# Undirected gap junction pairs: [81, 122, 92, 206, 286, 212, 285, 302]
+_PAPER_ELECTRICAL_EDGE_COUNTS: List[int] = [162, 244, 184, 412, 572, 424, 570, 604]
+_PAPER_ELECTRICAL_PAIR_COUNTS: List[int] = [81, 122, 92, 206, 286, 212, 285, 302]
+
+# Backwards compatibility alias for chemical synapses
+_PAPER_EDGE_COUNTS: List[int] = _PAPER_CHEMICAL_EDGE_COUNTS
 # Paper-reported neuron count (all snapshots)
 _PAPER_NEURON_COUNT: int = 225
 # Tolerance: allow ±5 % deviation from paper counts before raising
@@ -160,31 +169,32 @@ def _assert_no_overlap(
 
 def load_snapshot(
     reader,                  # cect WitvlietDataReader instance (from get_instance())
+    synclass: str = "Generic_CS",
+    all_nodes: List[str] | None = None,
     as_tensor: bool = True,
 ) -> torch.Tensor | np.ndarray:
     """
     Load a single Witvliet snapshot from a cect reader instance.
 
-    Uses reader.to_networkx_graph() → networkx DiGraph → dense adjacency
-    matrix.  Returns an (N, N) float32 tensor (or numpy array).
+    Uses reader.to_networkx_graph(synclass) → networkx DiGraph → dense adjacency
+    matrix. Returns an (N, N) float32 tensor (or numpy array).
     Diagonal is zeroed — no self-loops.
-
-    Design note: cect 0.3.5 API uses get_instance() + to_networkx_graph().
-    Directed adjacency is preserved (synaptic connections are directed).
     """
     import networkx as nx
 
-    # DESIGN CHOICE: to_networkx_graph() is the stable cect 0.3.5 interface.
-    # It returns a weighted DiGraph; we binarise (any weight > 0 → 1).
-    G = reader.to_networkx_graph()
-    nodes = sorted(G.nodes())
+    G = reader.to_networkx_graph(synclass)
+    if all_nodes is not None:
+        nodes = all_nodes
+    else:
+        nodes = sorted(G.nodes())
     n = len(nodes)
     node_idx = {node: i for i, node in enumerate(nodes)}
 
     adj_np = np.zeros((n, n), dtype=np.float32)
     for src, dst, data in G.edges(data=True):
-        i, j = node_idx[src], node_idx[dst]
-        adj_np[i, j] = 1.0   # binarise — weight info discarded for now
+        if src in node_idx and dst in node_idx:
+            i, j = node_idx[src], node_idx[dst]
+            adj_np[i, j] = 1.0   # binarise
 
     np.fill_diagonal(adj_np, 0)   # no self-loops
 
@@ -196,6 +206,7 @@ def load_snapshot(
 def load_all_snapshots(
     use_cect:    bool = True,
     devotg_path: Path | None = None,
+    synclass:    str = "Generic_CS",
 ) -> Tuple[List[torch.Tensor], List[int], List[str]]:
     """
     Load all 8 Witvliet snapshots.
@@ -204,6 +215,7 @@ def load_all_snapshots(
         use_cect:    if True, load via `cect` (default, independent cross-check).
         devotg_path: if provided, also load from DevoTG's pre-parsed format and
                      cross-check edge counts. Used in Phase 1.
+        synclass:    "Generic_CS" for chemical synapses, "Generic_GJ" for electrical gap junctions.
 
     Returns:
         snapshots : list of 8 (N, N) float32 tensors, index 0 = 0h.
@@ -220,7 +232,7 @@ def load_all_snapshots(
     ]
 
     if use_cect:
-        snapshots = _load_via_cect()
+        snapshots = _load_via_cect(synclass=synclass)
     else:
         if devotg_path is None:
             raise ValueError("devotg_path required when use_cect=False.")
@@ -235,8 +247,61 @@ def load_all_snapshots(
     return snapshots, list(REAL_HOURS), labels
 
 
-def _load_via_cect() -> List[torch.Tensor]:
-    """Load the 8 snapshots using the cect WitvlietDataReader classes."""
+def load_all_snapshots_both(
+    use_cect: bool = True,
+) -> Tuple[List[torch.Tensor], List[torch.Tensor], List[int], List[str]]:
+    """
+    Load all 8 Witvliet snapshots for both chemical synapses AND electrical gap junctions separately.
+
+    Chemical and electrical adjacency matrices are returned as separate lists of tensors,
+    both strictly aligned to the exact same global union of 225 neuron nodes. They are NEVER merged.
+
+    Returns:
+        chem_snapshots : list of 8 (N, N) float32 tensors for chemical synapses.
+        elec_snapshots : list of 8 (N, N) float32 tensors for electrical synapses (gap junctions).
+        hours          : list of 8 ints [0, 5, 8, 16, 23, 27, 45, 45].
+        labels         : human-readable stage labels.
+    """
+    labels = [
+        "L1_0h", "L1_5h", "L1_8h", "L1_16h",
+        "L2_23h", "L3_27h", "YA_45h_A", "YA_45h_B",
+    ]
+
+    try:
+        from cect.readers.WitvlietDataReader1 import get_instance as get1
+        from cect.readers.WitvlietDataReader2 import get_instance as get2
+        from cect.readers.WitvlietDataReader3 import get_instance as get3
+        from cect.readers.WitvlietDataReader4 import get_instance as get4
+        from cect.readers.WitvlietDataReader5 import get_instance as get5
+        from cect.readers.WitvlietDataReader6 import get_instance as get6
+        from cect.readers.WitvlietDataReader7 import get_instance as get7
+        from cect.readers.WitvlietDataReader8 import get_instance as get8
+    except ImportError as exc:
+        raise ImportError(
+            "cect not installed. Run: pip install cect\n"
+            "See THE_BOOK §6 for data access options."
+        ) from exc
+
+    readers = [get1(), get2(), get3(), get4(), get5(), get6(), get7(), get8()]
+    all_nodes_set = set()
+    for r in readers:
+        all_nodes_set.update(r.to_networkx_graph("Generic_CS").nodes())
+        all_nodes_set.update(r.to_networkx_graph("Generic_GJ").nodes())
+    all_nodes = sorted(list(all_nodes_set))
+
+    chem_snapshots = []
+    elec_snapshots = []
+    for reader in readers:
+        c_snap = load_snapshot(reader, synclass="Generic_CS", all_nodes=all_nodes, as_tensor=True)
+        e_snap = load_snapshot(reader, synclass="Generic_GJ", all_nodes=all_nodes, as_tensor=True)
+        chem_snapshots.append(c_snap)
+        elec_snapshots.append(e_snap)
+
+    return chem_snapshots, elec_snapshots, list(REAL_HOURS), labels
+
+
+def _load_via_cect(synclass: str = "Generic_CS") -> List[torch.Tensor]:
+    """Load the 8 snapshots using the cect WitvlietDataReader classes aligned to global union nodes."""
     try:
         from cect.readers.WitvlietDataReader1 import get_instance as get1
         from cect.readers.WitvlietDataReader2 import get_instance as get2
@@ -254,10 +319,15 @@ def _load_via_cect() -> List[torch.Tensor]:
 
     # get_instance() is the stable factory function in cect 0.3.5
     readers = [get1(), get2(), get3(), get4(), get5(), get6(), get7(), get8()]
+    all_nodes_set = set()
+    for r in readers:
+        all_nodes_set.update(r.to_networkx_graph("Generic_CS").nodes())
+        all_nodes_set.update(r.to_networkx_graph("Generic_GJ").nodes())
+    all_nodes = sorted(list(all_nodes_set))
 
     snapshots = []
-    for i, reader in enumerate(readers):
-        snap = load_snapshot(reader, as_tensor=True)
+    for reader in readers:
+        snap = load_snapshot(reader, synclass=synclass, all_nodes=all_nodes, as_tensor=True)
         snapshots.append(snap)
 
     return snapshots
@@ -315,21 +385,31 @@ def validate_node_consistency(
 def verify_paper_counts(
     snapshots: List[torch.Tensor],
     tolerance: float = _COUNT_TOLERANCE,
+    synclass: str = "Generic_CS",
 ) -> dict:
     """
     Compare loaded neuron and edge counts against the Witvliet (2021) paper.
     Returns a summary dict. Raises RuntimeError if neuron count is wrong;
     warns (does not raise) if edge counts deviate beyond tolerance.
 
+    Args:
+        snapshots: list of (N, N) adjacency tensors.
+        tolerance: fraction allowed deviation (default 5%).
+        synclass: "Generic_CS" (chemical, default) or "Generic_GJ" (electrical).
+
     This is the primary Phase 0 verification step.
     """
     results = {}
     n_neurons_expected = _PAPER_NEURON_COUNT
+    expected_list = (
+        _PAPER_CHEMICAL_EDGE_COUNTS if synclass == "Generic_CS"
+        else _PAPER_ELECTRICAL_EDGE_COUNTS
+    )
 
     for i, snap in enumerate(snapshots):
         n_neurons = snap.shape[0]
         n_edges   = int(snap.sum().item())
-        expected_edges = _PAPER_EDGE_COUNTS[i]
+        expected_edges = expected_list[i]
         hour      = REAL_HOURS[i]
 
         neuron_ok = (n_neurons == n_neurons_expected)
@@ -343,7 +423,7 @@ def verify_paper_counts(
             )
         if not edge_ok:
             warnings.warn(
-                f"Snapshot {i} ({hour}h): edge count {n_edges} deviates "
+                f"Snapshot {i} ({hour}h): {synclass} edge count {n_edges} deviates "
                 f"{edge_dev:.1%} from paper ({expected_edges}). "
                 f"Exceeds {tolerance:.0%} tolerance — check data source.",
                 stacklevel=2,
@@ -351,6 +431,7 @@ def verify_paper_counts(
 
         results[i] = {
             "hour": hour,
+            "synclass": synclass,
             "n_neurons": n_neurons,
             "n_edges": n_edges,
             "expected_edges": expected_edges,
@@ -360,3 +441,28 @@ def verify_paper_counts(
         }
 
     return results
+
+
+def verify_paper_counts_both(
+    chem_snapshots: List[torch.Tensor],
+    elec_snapshots: List[torch.Tensor],
+    tolerance: float = _COUNT_TOLERANCE,
+) -> dict:
+    """
+    Verify chemical synapses and electrical gap junctions independently against their paper values.
+
+    Never merges the two counts.
+    """
+    chem_results = verify_paper_counts(chem_snapshots, tolerance=tolerance, synclass="Generic_CS")
+    elec_results = verify_paper_counts(elec_snapshots, tolerance=tolerance, synclass="Generic_GJ")
+
+    combined = {}
+    for i in range(len(chem_snapshots)):
+        hour = REAL_HOURS[i]
+        combined[i] = {
+            "hour": hour,
+            "chemical": chem_results[i],
+            "electrical": elec_results[i],
+            "both_ok": chem_results[i]["edge_ok"] and elec_results[i]["edge_ok"] and chem_results[i]["neuron_ok"],
+        }
+    return combined

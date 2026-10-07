@@ -143,35 +143,66 @@ def build_connectome_temporal_data(
                     t_l.append(float(h))
                     msg_l.append([1.0])
     else:
-        # Load from Witvliet Excel datasets
-        import pandas as pd
-        if excel_dir is None:
-            excel_dir = DEVOTG_DIR / "data" / "connectome_datasets"
-        else:
-            excel_dir = Path(excel_dir)
+        # Load from canonical cect loader with chemical and electrical synapses properly separated
+        try:
+            from data.loader import load_all_snapshots_both, REAL_HOURS
+            chem_snaps, elec_snaps, hours, labels = load_all_snapshots_both(use_cect=True)
+            num_nodes = chem_snaps[0].shape[0]
+            if real_hours is None:
+                real_hours = hours
 
-        files = sorted(excel_dir.glob("witvliet_2020_*.xlsx"))
-        if not files:
-            raise FileNotFoundError(f"No Witvliet excel datasets found in {excel_dir}")
+            src_l, dst_l, t_l, msg_l = [], [], [], []
+            for snap_idx, (c_adj, e_adj, h) in enumerate(zip(chem_snaps, elec_snaps, real_hours)):
+                # Chemical synapse events (channel 0 = chemical indicator)
+                c_indices = torch.nonzero(c_adj)
+                for edge in c_indices:
+                    u, v = int(edge[0]), int(edge[1])
+                    if u != v:
+                        src_l.append(u)
+                        dst_l.append(v)
+                        t_l.append(float(h))
+                        msg_l.append([1.0, 0.0])  # [is_chem, is_elec]
 
-        dfs = [pd.read_excel(f) for f in files]
-        all_neurons = sorted(list(set.union(*[set(df["pre"]).union(set(df["post"])) for df in dfs])))
-        num_nodes = len(all_neurons)
-        neuron_to_idx = {n: i for i, n in enumerate(all_neurons)}
-        if real_hours is None:
-            real_hours = [0, 5, 8, 16, 23, 27, 45, 45]
+                # Electrical gap junction events (channel 1 = electrical indicator)
+                e_indices = torch.nonzero(e_adj)
+                for edge in e_indices:
+                    u, v = int(edge[0]), int(edge[1])
+                    if u != v:
+                        src_l.append(u)
+                        dst_l.append(v)
+                        t_l.append(float(h))
+                        msg_l.append([0.0, 1.0])  # [is_chem, is_elec]
+        except Exception:
+            # Fallback to excel files if cect is unavailable
+            import pandas as pd
+            if excel_dir is None:
+                excel_dir = DEVOTG_DIR / "data" / "connectome_datasets"
+            else:
+                excel_dir = Path(excel_dir)
 
-        src_l, dst_l, t_l, msg_l = [], [], [], []
-        for snap_idx, (df, h) in enumerate(zip(dfs, real_hours)):
-            for _, row in df.iterrows():
-                u = neuron_to_idx[row["pre"]]
-                v = neuron_to_idx[row["post"]]
-                if u != v:
-                    src_l.append(u)
-                    dst_l.append(v)
-                    t_l.append(float(h))
-                    syn = float(row.get("synapses", 1.0))
-                    msg_l.append([syn])
+            files = sorted(excel_dir.glob("witvliet_2020_*.xlsx"))
+            if not files:
+                raise FileNotFoundError(f"No Witvliet excel datasets found in {excel_dir}")
+
+            dfs = [pd.read_excel(f) for f in files]
+            all_neurons = sorted(list(set.union(*[set(df["pre"]).union(set(df["post"])) for df in dfs])))
+            num_nodes = len(all_neurons)
+            neuron_to_idx = {n: i for i, n in enumerate(all_neurons)}
+            if real_hours is None:
+                real_hours = [0, 5, 8, 16, 23, 27, 45, 45]
+
+            src_l, dst_l, t_l, msg_l = [], [], [], []
+            for snap_idx, (df, h) in enumerate(zip(dfs, real_hours)):
+                for _, row in df.iterrows():
+                    u = neuron_to_idx[row["pre"]]
+                    v = neuron_to_idx[row["post"]]
+                    if u != v:
+                        src_l.append(u)
+                        dst_l.append(v)
+                        t_l.append(float(h))
+                        is_chem = 1.0 if row.get("type") == "chemical" else 0.0
+                        is_elec = 1.0 if row.get("type") == "electrical" else 0.0
+                        msg_l.append([is_chem, is_elec])
 
     src = torch.tensor(src_l, dtype=torch.long)
     dst = torch.tensor(dst_l, dtype=torch.long)

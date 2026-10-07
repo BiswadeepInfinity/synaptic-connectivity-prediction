@@ -165,24 +165,78 @@ class TestPaperCounts:
     def test_neuron_and_edge_counts_match_paper(self):
         """
         PRIMARY PHASE 0 GATE.
-        Verify all 8 loaded snapshots match Witvliet (2021) Table 1 counts.
+        Verify all 8 loaded snapshots match Witvliet (2021) Table 1 counts
+        within 5% tolerance for edges and exactly for neuron count.
 
-        This test is SKIPPED until real data is accessible via cect.
-        Do NOT delete this test — it becomes the Phase 0 completion gate.
-        Enable by removing the skip once `cect` is installed and data loads.
+        Requires: pip install cect
+        Skipped automatically when cect is not installed.
         """
-        pytest.skip(
-            "Enable once real data is loaded. "
-            "Run: pip install cect, then remove this skip. "
-            "Expected: 225 neurons, 858–2496 edges per snapshot."
+        from data.loader import (
+            load_all_snapshots_both,
+            verify_paper_counts_both,
         )
-        # When enabled:
-        # from data.loader import load_all_snapshots
-        # snapshots, hours, labels = load_all_snapshots(use_cect=True)
-        # results = verify_paper_counts(snapshots)
-        # for i, r in results.items():
-        #     assert r["neuron_ok"], f"Snapshot {i}: wrong neuron count"
-        #     assert r["edge_ok"],   f"Snapshot {i}: edge count off by >{_COUNT_TOLERANCE:.0%}"
+        try:
+            chem_snaps, elec_snaps, hours, labels = load_all_snapshots_both(use_cect=True)
+        except ImportError:
+            pytest.skip("cect not installed — run: pip install cect")
+        except Exception as e:
+            pytest.skip(f"Witvliet data not available: {e}")
+
+        results = verify_paper_counts_both(chem_snaps, elec_snaps)
+        for i, r in results.items():
+            chem_r = r["chemical"]
+            elec_r = r["electrical"]
+            hour = r["hour"]
+            assert chem_r["neuron_ok"], (
+                f"Snapshot {i} ({hour}h): chemical neuron count {chem_r['n_neurons']} != 225."
+            )
+            assert chem_r["edge_ok"], (
+                f"Snapshot {i} ({hour}h): chemical edge count {chem_r['n_edges']} deviates "
+                f"{chem_r['edge_deviation_pct']:.1f}% from expected {chem_r['expected_edges']}."
+            )
+            assert elec_r["neuron_ok"], (
+                f"Snapshot {i} ({hour}h): electrical neuron count {elec_r['n_neurons']} != 225."
+            )
+            assert elec_r["edge_ok"], (
+                f"Snapshot {i} ({hour}h): electrical edge count {elec_r['n_edges']} deviates "
+                f"{elec_r['edge_deviation_pct']:.1f}% from expected {elec_r['expected_edges']}."
+            )
+
+    def test_raw_loaded_counts_match_paper_exactly(self):
+        """
+        Cross-check guard: both chemical and electrical counts from load_all_snapshots_both
+        must match their independent paper reference counts (never merged into one count).
+
+        Requires: pip install cect
+        """
+        from data.loader import (
+            load_all_snapshots_both,
+            _PAPER_CHEMICAL_EDGE_COUNTS,
+            _PAPER_ELECTRICAL_EDGE_COUNTS,
+        )
+        try:
+            chem_snaps, elec_snaps, hours, labels = load_all_snapshots_both(use_cect=True)
+        except ImportError:
+            pytest.skip("cect not installed — run: pip install cect")
+        except Exception as e:
+            pytest.skip(f"Witvliet data not available: {e}")
+
+        for i, (c_snap, e_snap, label) in enumerate(zip(chem_snaps, elec_snaps, labels)):
+            c_count = int(c_snap.sum().item())
+            c_expected = _PAPER_CHEMICAL_EDGE_COUNTS[i]
+            c_diff = abs(c_count - c_expected) / max(c_expected, 1)
+            assert c_diff <= 0.05, (
+                f"Snapshot {i} ({label}): chemical count {c_count} deviates "
+                f"{c_diff:.1%} from paper chemical count {c_expected}."
+            )
+
+            e_count = int(e_snap.sum().item())
+            e_expected = _PAPER_ELECTRICAL_EDGE_COUNTS[i]
+            e_diff = abs(e_count - e_expected) / max(e_expected, 1)
+            assert e_diff <= 0.05, (
+                f"Snapshot {i} ({label}): electrical count {e_count} deviates "
+                f"{e_diff:.1%} from paper electrical count {e_expected}."
+            )
 
     def test_verify_paper_counts_with_synthetic(self, synthetic_snapshots):
         """
@@ -191,20 +245,19 @@ class TestPaperCounts:
         """
         # Patch expected counts temporarily to match synthetic sizes
         import data.loader as loader_module
-        original = loader_module._PAPER_EDGE_COUNTS
+        original_chem = loader_module._PAPER_CHEMICAL_EDGE_COUNTS
 
         synthetic_edges = [int(s.sum().item()) for s in synthetic_snapshots]
-        loader_module._PAPER_EDGE_COUNTS = synthetic_edges
+        loader_module._PAPER_CHEMICAL_EDGE_COUNTS = synthetic_edges
         loader_module._PAPER_NEURON_COUNT = synthetic_snapshots[0].shape[0]
 
         try:
-            results = verify_paper_counts(synthetic_snapshots, tolerance=0.5)
+            results = loader_module.verify_paper_counts(synthetic_snapshots, tolerance=0.5, synclass="Generic_CS")
             for i, r in results.items():
-                # Should not raise; neuron counts match because we patched
                 assert "n_neurons" in r
                 assert "n_edges" in r
         finally:
-            loader_module._PAPER_EDGE_COUNTS = original
+            loader_module._PAPER_CHEMICAL_EDGE_COUNTS = original_chem
             loader_module._PAPER_NEURON_COUNT = 225
 
 
