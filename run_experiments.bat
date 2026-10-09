@@ -58,15 +58,36 @@ echo.
 echo   [10] Phase 3 -- Full Test Suite (Module A unit tests + paper-count gate)
 echo        - All A1/A2 unit tests + live paper-count verification + raw count cross-check
 echo.
-echo   [11] Run EVERYTHING: Phase 1 + Phase 2 + Phase 3 (full pipeline, all outputs)
+echo   -----------------------------------------------------------------------------------------
+echo   PHASE 4 -- STRUCTURAL MOTIF DISCOVERY ^& K-SWEEP  [NEW]
+echo   -----------------------------------------------------------------------------------------
+echo   [11] Phase 4 -- Full Output: Synthetic Sanity Check + Real K-Sweep Tables
+echo        - Verifies 4-node clique recovery on synthetic data (Phase 4 gate)
+echo        - K-sweep across {5, 10, 20, 50} for Chemical and Electrical synapses
+echo        - Full reconstruction loss, slot usage entropy, and developmental routing
 echo.
-echo   [12] Exit
+echo   [12] Phase 4 -- Unit ^& Integration Test Suite (Module C tests)
+echo        - Dictionary collapse detection, entropy checks, and synthetic recovery gate
+echo.
+echo   -----------------------------------------------------------------------------------------
+echo   RUN EVERYTHING ^& EXIT
+echo   -----------------------------------------------------------------------------------------
+echo   [13] Run EVERYTHING: Phase 1 (Reproduction) + Phase 2 (5-Seed Benchmark) + Phase 3 (Trajectory) + Phase 4 (Motifs)
+echo        - Runs all benchmark models, outputs all tables, and executes all test suites
+echo.
+echo   [14] Exit
 echo -----------------------------------------------------------------------------------------
 echo.
 
-set /p OPTION="Select option [1-12]: "
+set /p OPTION="Select option [1-14]: "
 
-if "%OPTION%"=="1" (
+if "%OPTION%"=="" goto menu
+goto opt_%OPTION% 2>nul
+echo.
+echo [!] Invalid selection '%OPTION%'. Please enter a number between 1 and 14.
+goto pause_step
+
+:opt_1
     echo.
     echo =====================================================================================
     echo [RUNNING PHASE 1 GATE]
@@ -75,9 +96,8 @@ if "%OPTION%"=="1" (
     echo =====================================================================================
     python -m pytest test_phase1_reproduction.py -v -s
     goto pause_step
-)
 
-if "%OPTION%"=="2" (
+:opt_2
     echo.
     echo =====================================================================================
     echo [RUNNING PHASE 2 UNIT TESTS]
@@ -85,9 +105,8 @@ if "%OPTION%"=="2" (
     echo =====================================================================================
     python -m pytest baseline/test_tgn.py -k "TestPhase2TGNBaseline" -v -s
     goto pause_step
-)
 
-if "%OPTION%"=="3" (
+:opt_3
     echo.
     echo =====================================================================================
     echo [RUNNING PHASE 2 5-SEED CONNECTOME BENCHMARK]
@@ -95,14 +114,12 @@ if "%OPTION%"=="3" (
     echo =====================================================================================
     python run_benchmark.py
     goto pause_step
-)
 
-if "%OPTION%"=="4" (
+:opt_4
     python research_audit.py
     goto pause_step
-)
 
-if "%OPTION%"=="5" (
+:opt_5
     echo.
     echo =====================================================================================
     echo [STARTING LOCAL VISUALIZER SERVER]
@@ -111,18 +128,16 @@ if "%OPTION%"=="5" (
     start http://localhost:8000
     python -m http.server 8000 --directory visualizer
     goto pause_step
-)
 
-if "%OPTION%"=="6" (
+:opt_6
     echo.
     echo =====================================================================================
     echo [RUNNING COMPLETE TEST SUITE - Phase 0 + Phase 1 + Phase 2]
     echo =====================================================================================
     python -m pytest data/test_loader.py baseline/test_tgn.py test_phase1_reproduction.py -v -s
     goto pause_step
-)
 
-if "%OPTION%"=="7" (
+:opt_7
     echo.
     echo =====================================================================================
     echo [PHASE 3] FULL OUTPUT: Ground-Truth Counts + Interpolation + H2 Ranking
@@ -143,9 +158,8 @@ if "%OPTION%"=="7" (
     echo.
     python run_phase3_trajectory.py
     goto pause_step
-)
 
-if "%OPTION%"=="8" (
+:opt_8
     echo.
     echo =====================================================================================
     echo [PHASE 3] DATA INTEGRITY: Raw Loaded Counts vs Witvliet 2021 Paper Values
@@ -161,9 +175,8 @@ if "%OPTION%"=="8" (
     echo.
     python scripts\check_paper_counts.py
     goto pause_step
-)
 
-if "%OPTION%"=="9" (
+:opt_9
     echo.
     echo =====================================================================================
     echo [PHASE 3] A2 METRIC AUDIT: What Is the Structural Feature Actually Measuring?
@@ -176,9 +189,8 @@ if "%OPTION%"=="9" (
     echo.
     python scripts\audit_a2_metrics.py
     goto pause_step
-)
 
-if "%OPTION%"=="10" (
+:opt_10
     echo.
     echo =====================================================================================
     echo [PHASE 3] FULL TEST SUITE: Module A Unit Tests + Paper-Count Gate
@@ -190,45 +202,48 @@ if "%OPTION%"=="10" (
     echo.
     python -m pytest data/test_loader.py pcdgm/test_module_a_trajectory.py -v -s
     goto pause_step
-)
 
-if "%OPTION%"=="11" (
+:opt_11
     echo.
     echo =====================================================================================
-    echo [RUNNING FULL PIPELINE: Phase 1 + Phase 2 + Phase 3]
-    echo  This will take several minutes. All tables and test results printed in sequence.
+    echo [PHASE 4] FULL OUTPUT: Synthetic Sanity Check + Real K-Sweep Tables
+    echo.
+    echo  What you will see:
+    echo   1. Synthetic Sanity Check: 4-node clique recovery on alternating windows
+    echo   2. Table 1: Chemical Synapses K-Sweep across K in {5, 10, 20, 50}
+    echo   3. Table 2: Electrical Synapses K-Sweep across K in {5, 10, 20, 50}
+    echo   4. Developmental Attention Routing across 6 developmental windows (k=3)
     echo =====================================================================================
     echo.
-
-    echo ---- [1/4] PHASE 3 OUTPUT -----------------------------------------------------------
-    python run_phase3_trajectory.py
-    echo.
-
-    echo ---- [2/4] PHASE 3 DATA INTEGRITY CHECK --------------------------------------------
-    python scripts\crosscheck_counts.py
-    echo.
-
-    echo ---- [3/4] PHASE 3 TEST SUITE -------------------------------------------------------
-    python -m pytest data/test_loader.py pcdgm/test_module_a_trajectory.py -v
-    echo.
-
-    echo ---- [4/4] PHASE 1 + PHASE 2 TEST SUITE --------------------------------------------
-    python -m pytest data/test_loader.py baseline/test_tgn.py test_phase1_reproduction.py -v
-    echo.
-
-    echo =====================================================================================
-    echo  FULL PIPELINE COMPLETE
-    echo =====================================================================================
+    python run_phase4_motifs.py
     goto pause_step
-)
 
-if "%OPTION%"=="12" (
+:opt_12
+    echo.
+    echo =====================================================================================
+    echo [PHASE 4] MODULE C TEST SUITE: Dictionary Unit Tests + Injected Recovery Gate
+    echo.
+    echo  Tests run:
+    echo   pcdgm/test_module_c_motifs.py - collapse detection, entropy, full window recon,
+    echo                                  random vs learned ablation hook, synthetic gate
+    echo =====================================================================================
+    echo.
+    python -m pytest pcdgm/test_module_c_motifs.py -v -s
+    goto pause_step
+
+:opt_13
+    echo.
+    echo =====================================================================================
+    echo [RUNNING FULL PIPELINE: Phase 1 + Phase 2 + Phase 3 + Phase 4]
+    echo  All benchmarks, tables, and test results executed in sequence.
+    echo =====================================================================================
+    echo.
+    python scripts\run_all_phases.py
+    goto pause_step
+
+:opt_14
     echo Exiting workbench.
     exit /b 0
-)
-
-echo.
-echo [!] Invalid selection. Please enter a number between 1 and 12.
 
 :pause_step
 echo.

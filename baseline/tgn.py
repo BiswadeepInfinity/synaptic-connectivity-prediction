@@ -89,8 +89,10 @@ def run_devotg_reproduction(
     if seeds is None:
         seeds = (42, 12345, 123, 456, 789)
 
-    aucs = [
-        run_devotg_single_seed(
+    aucs = []
+    for idx, s in enumerate(seeds):
+        print(f"  [DevoTG Reproduction] Running Seed {s} ({idx+1}/{len(seeds)})...", flush=True)
+        auc = run_devotg_single_seed(
             seed=s,
             epochs=epochs,
             val_ratio=val_ratio,
@@ -99,8 +101,8 @@ def run_devotg_reproduction(
             device=device,
             csv_path=csv_path,
         )
-        for s in seeds
-    ]
+        print(f"  --> Seed {s} Test AUC: {auc:.4f}", flush=True)
+        aucs.append(auc)
 
     mean_auc = float(np.mean(aucs))
     return mean_auc
@@ -445,15 +447,17 @@ def run_connectome_tgn_experiment(
         test_loader = TemporalDataLoader(test_data, batch_size=batch_size, neg_sampling_ratio=1.0)
 
 
+        print(f"  [TGN Benchmark] Training Seed {s} ({len(results)+1}/{len(seeds)})...", flush=True)
         for epoch in range(epochs):
             model.memory.reset_state()
             model.neighbor_loader.reset_state()
             for batch in train_loader:
                 model.step(batch, train_data)
+            print(f"    Seed {s} | Epoch {epoch+1}/{epochs} finished", flush=True)
 
         val_ap, val_auc = model.evaluate(val_loader, data)
         test_ap, test_auc = model.evaluate(test_loader, data)
-
+        print(f"    --> Seed {s} Done: Val AUC={val_auc:.4f}, Test AUC={test_auc:.4f}, Test AP={test_ap:.4f}\n", flush=True)
 
         results.append({
             "seed": s,

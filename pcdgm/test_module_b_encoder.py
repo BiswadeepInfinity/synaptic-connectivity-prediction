@@ -15,8 +15,7 @@ from pcdgm.module_b_encoder import StructuralEncoder
 class TestModuleB:
 
     def test_output_shape(self, synthetic_snapshots):
-        pytest.skip("Phase 5 not yet implemented.")
-        enc = StructuralEncoder(hidden_dim=64)
+        enc = StructuralEncoder(hidden_dim=100, out_dim=64)
         H = enc(synthetic_snapshots[0])
         assert H.shape == (20, 64), f"Expected [20, 64], got {H.shape}"
 
@@ -25,8 +24,7 @@ class TestModuleB:
         BatchNorm is unstable at small N (20–225 nodes per graph).
         LayerNorm must be used instead. THE_BOOK anomaly table.
         """
-        pytest.skip("Phase 5 not yet implemented.")
-        enc = StructuralEncoder(hidden_dim=64)
+        enc = StructuralEncoder(hidden_dim=100, out_dim=64)
         for name, m in enc.named_modules():
             assert not isinstance(m, torch.nn.BatchNorm1d), (
                 f"BatchNorm found at '{name}'. Use LayerNorm instead."
@@ -40,9 +38,8 @@ class TestModuleB:
         Fully isolated graph (no edges) must not produce NaN.
         GAT with zero-degree nodes can produce NaN if softmax over empty set.
         """
-        pytest.skip("Phase 5 not yet implemented.")
         isolated_graph = torch.zeros(20, 20)
-        enc = StructuralEncoder(hidden_dim=64)
+        enc = StructuralEncoder(hidden_dim=100, out_dim=64)
         H = enc(isolated_graph)
         assert not torch.isnan(H).any(), (
             "NaN in encoder output for isolated graph — check GAT attention "
@@ -53,6 +50,6 @@ class TestModuleB:
         """
         Encoder must only use structural features (degree, clustering coeff,
         k-hop neighbourhood). No calcium / electrophysiology features.
-        This is a code-review check, not auto-verifiable — left as reminder.
         """
-        pytest.skip("Phase 5 not yet implemented — review manually at implementation.")
+        enc = StructuralEncoder(hidden_dim=100, out_dim=64)
+        assert enc.in_dim == 4, f"Expected 4 topological features, got {enc.in_dim}"
