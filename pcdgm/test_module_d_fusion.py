@@ -19,7 +19,6 @@ class TestGraphFusion:
         Passing a [64] graph-level vector directly is a hard error
         (THE_BOOK anomaly: broadcast confusion).
         """
-        pytest.skip("Phase 5 not yet implemented.")
         fusion = GraphFusion(out_dim=100)
         H = torch.randn(20, 64)
         z_per_node = torch.randn(20, 64)   # already broadcast to N rows
@@ -31,9 +30,9 @@ class TestGraphFusion:
         GraphFusion must assert z_per_node.shape[0] == N and raise if not.
         This assertion is MANDATORY per THE_BOOK §Module D.
         """
-        pytest.skip("Phase 5 not yet implemented.")
         fusion = GraphFusion(out_dim=100)
         H = torch.randn(20, 64)
         z_wrong = torch.randn(1, 64)  # graph-level, not broadcast
         with pytest.raises((AssertionError, RuntimeError)):
             fusion(H, z_wrong, synthetic_snapshots[0])
+

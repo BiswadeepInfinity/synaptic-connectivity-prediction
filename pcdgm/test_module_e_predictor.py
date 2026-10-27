@@ -19,7 +19,6 @@ class TestChangePredictor:
         to collapse and predict zero everywhere. Mean prediction must be > 0.001.
         THE_BOOK anomaly: model collapses under class imbalance.
         """
-        pytest.skip("Phase 5 not yet implemented.")
         model = ChangePredictor(dim=100)
         H = torch.randn(20, 100)
         z = torch.randn(20, 64)
@@ -35,7 +34,6 @@ class TestChangePredictor:
         not a raw float hour. Claiming hour-level precision is not supported
         by the data (8 discrete points). THE_BOOK §Resolution honesty rule.
         """
-        pytest.skip("Phase 5 not yet implemented.")
         model = ChangePredictor(dim=100)
         H = torch.randn(20, 100)
         z = torch.randn(20, 64)
@@ -47,3 +45,4 @@ class TestChangePredictor:
         assert interval in range(8), (
             f"Interval {interval} out of range(8)."
         )
+

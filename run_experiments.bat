@@ -70,21 +70,31 @@ echo   [12] Phase 4 -- Unit ^& Integration Test Suite (Module C tests)
 echo        - Dictionary collapse detection, entropy checks, and synthetic recovery gate
 echo.
 echo   -----------------------------------------------------------------------------------------
+echo   PHASE 5 -- PATTERN-CONDITIONED TRAINING LOOP ^& BENCHMARK  [NEW]
+echo   -----------------------------------------------------------------------------------------
+echo   [13] Phase 5 -- Full Benchmark: 3 Motif Variants across 5 Seeds
+echo        - Evaluates: No Motif vs. Random Untrained vs. Learned Patterns (PCDGM)
+echo        - Phase 2 split (replicates together), negative sampling, AUROC / AUPRC vs 0.6527
+echo.
+echo   [14] Phase 5 -- Comprehensive Test Suite (Modules B, D, E ^& Training Loop)
+echo        - Tests: Module B encoder, Module D fusion, Module E predictor, TrainingLoop
+echo.
+echo   -----------------------------------------------------------------------------------------
 echo   RUN EVERYTHING ^& EXIT
 echo   -----------------------------------------------------------------------------------------
-echo   [13] Run EVERYTHING: Phase 1 (Reproduction) + Phase 2 (5-Seed Benchmark) + Phase 3 (Trajectory) + Phase 4 (Motifs)
-echo        - Runs all benchmark models, outputs all tables, and executes all test suites
+echo   [15] Run EVERYTHING: Phase 1 (Reproduction) + Phase 2 (5-Seed Benchmark) + Phase 3 (Trajectory) + Phase 4 (Motifs) + Phase 5 (PCDGM Benchmark ^& Tests)
+echo        - Runs all benchmark models, outputs all tables, and executes all test suites (Phases 0 to 5)
 echo.
-echo   [14] Exit
+echo   [16] Exit
 echo -----------------------------------------------------------------------------------------
 echo.
 
-set /p OPTION="Select option [1-14]: "
+set /p OPTION="Select option [1-16]: "
 
 if "%OPTION%"=="" goto menu
 goto opt_%OPTION% 2>nul
 echo.
-echo [!] Invalid selection '%OPTION%'. Please enter a number between 1 and 14.
+echo [!] Invalid selection '%OPTION%'. Please enter a number between 1 and 16.
 goto pause_step
 
 :opt_1
@@ -234,14 +244,44 @@ goto pause_step
 :opt_13
     echo.
     echo =====================================================================================
-    echo [RUNNING FULL PIPELINE: Phase 1 + Phase 2 + Phase 3 + Phase 4]
-    echo  All benchmarks, tables, and test results executed in sequence.
+    echo [PHASE 5] STEPS 3 ^& 4: SPREAD GATE EVALUATION ^& PAIRED 3-VARIANT BENCHMARK
+    echo  Step 3: Spread Gate (Cosine Sim, Std, Entropy, Degree R^2 across 6 Windows)
+    echo  Step 4: Paired 5-Seed Retest (No-Motif vs. Random vs. Learned PCDGM with tau=0.1)
+    echo =====================================================================================
+    echo.
+    python scripts\run_attempts_gate.py
+    echo.
+    echo -------------------------------------------------------------------------------------
+    echo  Proceeding to Step 4 Paired Multi-Seed Retest Benchmark...
+    echo -------------------------------------------------------------------------------------
+    python run_phase5_training.py
+    goto pause_step
+
+:opt_14
+    echo.
+    echo =====================================================================================
+    echo [PHASE 5] TEST SUITE: Modules B, D, E and Training Loop Tests
+    echo  Tests run:
+    echo   pcdgm/test_module_b_encoder.py
+    echo   pcdgm/test_module_d_fusion.py
+    echo   pcdgm/test_module_e_predictor.py
+    echo   training/test_loop.py
+    echo =====================================================================================
+    echo.
+    python -m pytest pcdgm/test_module_b_encoder.py pcdgm/test_module_d_fusion.py pcdgm/test_module_e_predictor.py training/test_loop.py -v -s
+    goto pause_step
+
+:opt_15
+    echo.
+    echo =====================================================================================
+    echo [RUNNING FULL PIPELINE: Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5]
+    echo  All benchmarks, tables, and test suites (Phases 0 to 5) executed in sequence.
     echo =====================================================================================
     echo.
     python scripts\run_all_phases.py
     goto pause_step
 
-:opt_14
+:opt_16
     echo Exiting workbench.
     exit /b 0
 

@@ -1,0 +1,109 @@
+Created At: 2026-10-13T10:32:53+05:30
+Completed At: 2026-10-13T10:32:53+05:30
+File Path: `file:///d:/synaptic-connectivity-prediction/run_phase5_training.py`
+Total Lines: 278
+Total Bytes: 10637
+Showing lines 30 to 130
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+30: if str(DEVOTG_DIR) not in sys.path:
+31:     sys.path.insert(0, str(DEVOTG_DIR))
+32: 
+33: from devotg.models.tgn_model import GraphAttentionEmbedding, LinkPredictor
+34: from torch_geometric.nn import TGNMemory
+35: from torch_geometric.nn.models.tgn import IdentityMessage, LastAggregator, LastNeighborLoader
+36: from torch_geometric.loader import TemporalDataLoader
+37: 
+38: from baseline.tgn import build_connectome_temporal_data, split_connectome_temporal_data
+39: 
+40: 
+41: class ConnectomePCDGM(nn.Module):
+42:     """
+43:     Connectome temporal graph model supporting all 3 motif variants.
+44:     """
+45: 
+46:     def __init__(
+47:         self,
+48:         num_nodes: int,
+49:         msg_dim: int,
+50:         variant: str = "learned",  # "no_motif" | "random_untrained" | "learned"
+51:         K: int = 10,
+52:         node_dim: int = 64,
+53:         motif_dim: int = 64,
+54:         device: str = "cpu",
+55:     ):
+56:         super().__init__()
+57:         self.num_nodes = num_nodes
+58:         self.msg_dim = msg_dim
+59:         self.variant = variant
+60:         self.node_dim = node_dim
+61:         self.motif_dim = motif_dim if variant != "no_motif" else 0
+62:         self.device = torch.device(device)
+63: 
+64:         self.memory = TGNMemory(
+65:             num_nodes=num_nodes,
+66:             raw_msg_dim=msg_dim,
+67:             memory_dim=node_dim,
+68:             time_dim=node_dim,
+69:             message_module=IdentityMessage(msg_dim, node_dim, node_dim),
+70:             aggregator_module=LastAggregator(),
+71:         ).to(self.device)
+72: 
+73:         self.gnn = GraphAttentionEmbedding(
+74:             in_channels=node_dim,
+75:             out_channels=node_dim,
+76:             msg_dim=msg_dim,
+77:             time_enc=self.memory.time_enc,
+78:         ).to(self.device)
+79: 
+80:         if self.variant == "learned":
+81:             self.D = nn.Parameter(torch.randn(K, motif_dim, device=self.device) / (motif_dim**0.5))
+82:             self.proj_h = nn.Linear(node_dim, motif_dim).to(self.device)
+83:             self.fusion_layer = nn.Linear(node_dim + motif_dim, node_dim).to(self.device)
+84:         elif self.variant == "random_untrained":
+85:             self.D = nn.Parameter(torch.randn(K, motif_dim, device=self.device) / (motif_dim**0.5), requires_grad=False)
+86:             self.proj_h = nn.Linear(node_dim, motif_dim).to(self.device)
+87:             self.fusion_layer = nn.Linear(node_dim + motif_dim, node_dim).to(self.device)
+88:         else:
+89:             self.D = None
+90:             self.proj_h = None
+91:             self.fusion_layer = None
+92: 
+93:         self.link_pred = LinkPredictor(in_channels=node_dim).to(self.device)
+94:         self.assoc = torch.empty(num_nodes, dtype=torch.long, device=self.device)
+95:         self.neighbor_loader = LastNeighborLoader(num_nodes, size=10, device=self.device)
+96:         self.criterion = nn.BCEWithLogitsLoss()
+97: 
+98:         trainable_params = list(self.memory.parameters()) + list(self.gnn.parameters()) + list(self.link_pred.parameters())
+99:         if self.variant in ("learned", "random_untrained"):
+100:             trainable_params += list(self.proj_h.parameters()) + list(self.fusion_layer.parameters())
+101:             if self.variant == "learned":
+102:                 trainable_params += [self.D]
+103: 
+104:         self.optimizer = torch.optim.Adam(trainable_params, lr=0.001)
+105: 
+106:     def forward_nodes(self, n_id, edge_index, t, msg):
+107:         z, last_update = self.memory(n_id)
+108:         z = self.gnn(z, last_update, edge_index, t, msg)
+109: 
+110:         if self.variant in ("learned", "random_untrained"):
+111:             # Per-neuron motif vector derived from its own node embedding
+112:             h_proj = self.proj_h(z)  # [B, motif_dim]
+113:             logits = torch.matmul(h_proj, self.D.t()) / (self.motif_dim**0.5)
+114:             a = torch.softmax(logits, dim=-1)  # [B, K]
+115:             z_m = torch.matmul(a, self.D)  # [B, motif_dim]
+116:             z = torch.relu(self.fusion_layer(torch.cat([z, z_m], dim=-1)))
+117: 
+118:         return z
+119: 
+120:     def step(self, batch, temporal_data) -> float:
+121:         self.train()
+122:         self.optimizer.zero_grad()
+123:         batch = batch.to(self.device)
+124: 
+125:         n_id, edge_index, e_id = self.neighbor_loader(batch.n_id)
+126:         self.assoc[n_id] = torch.arange(n_id.size(0), device=self.device)
+127: 
+128:         z = self.forward_nodes(
+129:             n_id,
+130:             edge_index,
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.
