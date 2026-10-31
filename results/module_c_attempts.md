@@ -90,19 +90,29 @@ This document records every structural motif discovery (Module C) configuration 
     * Mean feature std across neurons: **$0.0464$**.
     * Mean attention entropy / $\ln(K)$: **$0.7507$**.
     * Degree check: Mean Pearson $r = 0.0602$, $R^2 = 0.0270$ (motif representation is non-confounded with degree).
-  * **5-Seed Paired Connectome Benchmark:**
+  * **5-Seed Paired Connectome Benchmark (Canonical Verified Result):**
     * 1. No Motif Module: AUROC **$0.6547 \pm 0.0072$** | AUPRC **$0.6378 \pm 0.0061$** | Val AUROC **$0.6736 \pm 0.0066$**
-    * 2. Random Untrained ($D$ frozen): AUROC **$0.6441 \pm 0.0183$** | AUPRC **$0.6278 \pm 0.0196$** | Val AUROC **$0.6700 \pm 0.0134$**
-    * 3. Learned Patterns (PCDGM): AUROC **$0.6545 \pm 0.0065$** | AUPRC **$0.6362 \pm 0.0067$** | Val AUROC **$0.6781 \pm 0.0034$**
+    * 2. Random Untrained ($\tau = 0.1$, $D$ frozen): AUROC **$0.6427 \pm 0.0192$** | AUPRC **$0.6226 \pm 0.0223$** | Val AUROC **$0.6706 \pm 0.0134$**
+    * 3. Learned Patterns ($\tau = 0.1$, PCDGM): AUROC **$0.6517 \pm 0.0087$** | AUPRC **$0.6352 \pm 0.0096$** | Val AUROC **$0.6753 \pm 0.0047$**
   * **Statistical Significance (Paired $t$-tests):**
-    * Learned vs. No-Motif: Mean paired diff = $-0.0003$, $t = -0.0413$, $p = 0.9690$ (not significant).
-    * Learned vs. Random: Mean paired diff = $+0.0104$, $t = 1.4853$, $p = 0.2117$ (not significant).
+    * Learned vs. No-Motif: Mean paired diff = $-0.0031$, $t = -0.4487$, $p = 0.6769$ (not significant).
+    * Learned vs. Random:   Mean paired diff = $+0.0090$, $t = 0.9927$, $p = 0.3770$ (not significant).
 * **Outcome:** **Successfully dispersed neuron motifs ($0.4049$ cosine similarity) without degree confounding ($R^2 = 0.027$), but the learned motif dictionary does not statistically outperform plain TGN on link prediction (null result).**
 
 ---
 
+### Superseded Runs
+The following earlier benchmark runs are superseded by the canonical result in `results/final_h1_run1.txt` and `results/final_h1_run2.txt`:
+1. **First Benchmark (Attempt 6):** Learned arm AUROC $0.6463$, no mean-centering, scaling by $\sqrt{d}$.
+2. **Manual Retest:** Random arm AUROC $0.6412$, seed 123 = $0.6376$, learned arm AUROC $0.6558$ ($\tau = 0.1$, uncentered; the exact script was not preserved).
+3. **AI Initial Rerun:** Random arm AUROC $0.6441$, learned arm AUROC $0.6545$.
+
+The difference between the manual retest and the initial AI rerun is unexplained. The final-run files (`results/final_h1_run1.txt` and `results/final_h1_run2.txt`) represent the canonical result.
+
+---
+
 ### Benchmark Script Rewrite, Determinism Hardening & Rerun
-* **Code Rewrite & Deterministic Rerun:** `run_phase5_training.py` was rewritten to pair all 3 variants (`no_motif`, `random_untrained`, `learned`) across the exact same seeded mini-batches and model initializations. Deterministic execution was strictly enforced (`torch.use_deterministic_algorithms(True)`, `random.seed(s)`, and `CUBLAS_WORKSPACE_CONFIG=:4096:8`), eliminating slight batch-sampling float drift and guaranteeing bit-identical test outputs across repeated runs.
+* **Code Rewrite & Deterministic Rerun:** `run_phase5_training.py` was updated to call `validate_seeds` on the seed list and pair all 3 variants (`no_motif`, `random_untrained`, `learned`) across the exact same seeded mini-batches and model initializations. Deterministic execution was strictly enforced (`torch.use_deterministic_algorithms(True)`, `random.seed(s)`, and `CUBLAS_WORKSPACE_CONFIG=:4096:8`), eliminating slight batch-sampling float drift; determinism was verified on the runs listed here only.
 * **Status of Module B/C/D/E Architecture & "When" Prediction:**
   * **Plain Statement:** The full modular `PCDGM` architecture combining Modules B, C, D, and E (`pcdgm/model.py`) and the Module E "when" (temporal interval / timing) prediction head have **not been evaluated on real connectome data**.
   * The Phase 5 connectome benchmark evaluated link prediction ("where") on real Witvliet connectome data using the baseline `ConnectomePCDGM` (TGN-based architecture with motif slot attention). The full end-to-end `PCDGM` model (incorporating GAT Module B, temporal trajectory interpolation, fused predictor Module E, and multi-task loss with $L_{\text{timing}}$) has only been validated in synthetic unit/integration test suites and has not been run or benchmarked on real connectome data.

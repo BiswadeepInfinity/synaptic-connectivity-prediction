@@ -1,0 +1,61 @@
+===============================================================================================
+  PHASE 5 RETEST: MULTI-SEED 3-VARIANT BENCHMARK (tau = 0.1)
+  Paired 5 Seeds across No-Motif, Random-Untrained, and Learned PCDGM
+===============================================================================================
+cect      >>>  Opened the Excel file (Witvliet data): C:\Users\madhu\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\cect\readers/../data/witvliet_2020_1 L1.xlsx
+cect      >>>  Opened the Excel file (Witvliet data): C:\Users\madhu\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\cect\readers/../data/witvliet_2020_2 L1.xlsx
+cect      >>>  Opened the Excel file (Witvliet data): C:\Users\madhu\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\cect\readers/../data/witvliet_2020_3 L1.xlsx
+cect      >>>  Opened the Excel file (Witvliet data): C:\Users\madhu\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\cect\readers/../data/witvliet_2020_4 L1.xlsx
+cect      >>>  Opened the Excel file (Witvliet data): C:\Users\madhu\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\cect\readers/../data/witvliet_2020_5 L2.xlsx
+cect      >>>  Opened the Excel file (Witvliet data): C:\Users\madhu\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\cect\readers/../data/witvliet_2020_6 L3.xlsx
+cect      >>>  Opened the Excel file (Witvliet data): C:\Users\madhu\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\cect\readers/../data/witvliet_2020_7 adult.xlsx
+cect      >>>  Opened the Excel file (Witvliet data): C:\Users\madhu\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\cect\readers/../data/witvliet_2020_8 adult.xlsx
+
+===============================================================================================
+CONFIG DIFF BETWEEN THE THREE ARMS:
+===============================================================================================
+  [Shared by all 3 arms]
+    - Data Split: Train (0h, 5h, 8h, 16h, 23h), Val (27h), Test (45h Replicates A & B)
+    - Negative Sampling: 1:1 ratio (neg_sampling_ratio=1.0)
+    - Base Architecture: TGN Memory (64-dim) + GraphAttentionEmbedding (64-dim) + LinkPredictor
+    - Optimizer: Adam, lr=0.001, epochs=5, batch_size=200
+    - Seeding: Paired seeds [42, 12345, 123, 456, 789] applied identically before data loader & model init
+  [Differences]
+    - no_motif:         motif_dim=0, no motif dictionary or projection layer.
+    - random_untrained: motif_dim=64, frozen D (requires_grad=False), centered h + L2 norm, tau=0.1.
+    - learned:          motif_dim=64, trainable D (requires_grad=True), centered h + L2 norm, tau=0.1.
+===============================================================================================
+
+---> Running Paired Seed: 42
+---> Running Paired Seed: 12345
+---> Running Paired Seed: 123
+---> Running Paired Seed: 456
+---> Running Paired Seed: 789
+
+===============================================================================================
+  TABLE 1: PER-SEED TEST PERFORMANCE
+===============================================================================================
+Seed     | No-Motif AUC   | Random AUC     | Learned AUC    | No-Motif AP    | Random AP      | Learned AP    
+-----------------------------------------------------------------------------------------------
+42       | 0.6601         | 0.6429         | 0.6376         | 0.6441         | 0.6233         | 0.6186        
+12345    | 0.6523         | 0.6671         | 0.6613         | 0.6336         | 0.6516         | 0.6470        
+123      | 0.6489         | 0.6448         | 0.6607         | 0.6363         | 0.6218         | 0.6405        
+456      | 0.6659         | 0.6082         | 0.6498         | 0.6455         | 0.5833         | 0.6324        
+789      | 0.6466         | 0.6504         | 0.6489         | 0.6294         | 0.6332         | 0.6374        
+
+===============================================================================================
+  TABLE 2: AGGREGATE TEST PERFORMANCE & REFERENCE COMPARISON (0.6527)
+===============================================================================================
+Variant                      | Test AUROC           | Test AUPRC           | Val AUROC       
+-----------------------------------------------------------------------------------------------
+1. No Motif Module           | 0.6547 +/- 0.0072     | 0.6378 +/- 0.0061     | 0.6736 +/- 0.0066
+2. Random Untrained (tau=0.1) | 0.6427 +/- 0.0192     | 0.6226 +/- 0.0223     | 0.6706 +/- 0.0134
+3. Learned Patterns (tau=0.1) | 0.6517 +/- 0.0087     | 0.6352 +/- 0.0096     | 0.6753 +/- 0.0047
+===============================================================================================
+
+===============================================================================================
+  TABLE 3: PAIRED T-TESTS (TEST AUROC)
+===============================================================================================
+  Learned vs. No-Motif: Mean Paired Diff = -0.0031 | t = -0.4487 | p = 0.6769
+  Learned vs. Random:   Mean Paired Diff = +0.0090 | t = 0.9927 | p = 0.3770
+===============================================================================================

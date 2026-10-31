@@ -275,7 +275,9 @@ def main():
     print("  Paired 5 Seeds across No-Motif, Random-Untrained, and Learned PCDGM")
     print("=" * 95)
 
+    from training.loop import validate_seeds
     seeds = (42, 12345, 123, 456, 789)
+    seeds = validate_seeds(seeds)
     results = run_paired_experiment(seeds=seeds, epochs=5)
 
     print("\n" + "=" * 95)
